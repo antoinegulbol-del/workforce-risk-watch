@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workforce Risk Watch</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#04092D">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a one-screen operations view. Summary strip on top, world map left, scannable event list right; stacks to one column on narrow screens.
+   Didomi Design System, light theme only by brand choice. */
+:root{
+  color-scheme: light;
+  --navy:#04092D;
+  --ink:#202544;
+  --ink-soft:#5b5f78;
+  --page:#F4F3F3;
+  --card:#FFFFFF;
+  --line:#dedde3;
+  --accent:#465CEE;
+  --accent-soft:#e9ecfd;
+  --sev3:#ED4D43;
+  --sev2:#F2BE00;
+  --sev1:#08D8A6;
+  --land:#e3e3ea;
+  --font:"Montserrat", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--page);color:var(--ink);font-family:var(--font);font-weight:400;font-size:14px;line-height:1.5}
+.app{max-width:1360px;margin:0 auto;padding:20px 20px 32px;display:flex;flex-direction:column;gap:16px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-size:24px;font-weight:600;margin:0;color:var(--navy);text-wrap:balance;letter-spacing:-0.01em}
+.sub{margin:2px 0 0;color:var(--ink-soft);font-size:13px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tag{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid var(--navy);color:var(--navy);background:transparent}
+.tag.draft{background:var(--navy);color:#fff}
+.fresh{font-size:12px;color:var(--ink-soft)}
+.fresh strong{font-weight:600;color:var(--ink)}
+.notice{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--sev2);border-radius:8px;padding:10px 14px;font-size:13px}
+.notice[hidden]{display:none}
+
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat .n{font-size:28px;font-weight:600;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .l{font-size:12px;font-weight:500;color:var(--ink-soft);display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;border:1px solid rgba(4,9,45,.25)}
+.dot.s3{background:var(--sev3)}.dot.s2{background:var(--sev2)}.dot.s1{background:var(--sev1)}
+
+.controls{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row .lab{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);width:74px;flex:none}
+.chip{font-family:var(--font);font-size:12px;font-weight:500;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--page);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip .c{font-variant-numeric:tabular-nums;opacity:.75}
+button:focus-visible,input:focus-visible,.item:focus-visible,a:focus-visible,circle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#search{font-family:var(--font);font-size:13px;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--page);color:var(--ink);min-width:0;flex:1 1 200px;max-width:340px}
+.reset{font-family:var(--font);font-size:12px;font-weight:500;background:none;border:none;color:var(--accent);cursor:pointer;padding:4px 6px;text-decoration:underline}
+
+.main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;min-width:0}
+.panel h2{font-size:13px;font-weight:600;margin:0;padding:12px 16px;border-bottom:1px solid var(--line);color:var(--navy);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.panel h2 span{font-weight:400;color:var(--ink-soft);font-size:12px}
+.mapwrap{position:relative;padding:8px}
+#map{display:block;width:100%;height:auto}
+.country{fill:var(--land);stroke:#fff;stroke-width:.5}
+.sphere{fill:#fafafb;stroke:var(--line)}
+.mk{cursor:pointer;stroke:var(--navy);stroke-width:1;fill-opacity:.9}
+.mk.s3{fill:var(--sev3)}.mk.s2{fill:var(--sev2)}.mk.s1{fill:var(--sev1)}
+.mk.sel{stroke-width:3;fill-opacity:1}
+.halo{fill:none;stroke:var(--sev3);stroke-width:1.2;opacity:.5;pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:var(--navy);color:#fff;font-size:12px;padding:8px 10px;border-radius:6px;max-width:240px;z-index:2;line-height:1.35}
+.tip b{font-weight:600;display:block}
+.tip[hidden]{display:none}
+.legend{display:flex;flex-wrap:wrap;gap:14px;padding:8px 16px 12px;font-size:12px;color:var(--ink-soft)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+.list{max-height:640px;overflow-y:auto}
+.item{display:block;width:100%;text-align:left;font-family:var(--font);background:none;border:none;border-bottom:1px solid var(--line);border-left:4px solid transparent;padding:12px 14px 12px 12px;cursor:pointer;color:var(--ink)}
+.item:last-child{border-bottom:none}
+.item.s3{border-left-color:var(--sev3)}.item.s2{border-left-color:var(--sev2)}.item.s1{border-left-color:var(--sev1)}
+.item:hover,.item.sel{background:var(--accent-soft)}
+.item .meta{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:11px;color:var(--ink-soft);font-weight:500;align-items:center}
+.item .cat{text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--navy)}
+.item .sev{display:inline-flex;align-items:center;gap:5px}
+.item .ttl{font-size:14px;font-weight:600;color:var(--navy);margin:3px 0 1px;overflow-wrap:anywhere}
+.item .where{font-size:12px;color:var(--ink-soft)}
+.detail{margin-top:8px;font-size:13px;display:none}
+.item.sel .detail{display:block}
+.detail p{margin:0 0 8px}
+.detail .k{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);display:block}
+.detail a{color:var(--accent);font-weight:500;overflow-wrap:anywhere}
+.empty{padding:28px 16px;text-align:center;color:var(--ink-soft);font-size:13px}
+footer{font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:4px;max-width:90ch}
+footer b{font-weight:600;color:var(--ink)}
+
+@media (max-width:900px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .list{max-height:none}
+  .row .lab{width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Workforce Risk Watch</h1>
+      <p class="sub">Natural disasters, armed conflicts, unrest and health alerts worldwide that could affect our people.</p>
+    </div>
+    <div class="tags">
+      <span class="fresh" id="fresh">Loading events…</span>
+      <span class="tag">People team</span>
+      <span class="tag draft">Working draft</span>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <section class="summary" aria-label="Summary">
+    <div class="stat"><span class="n" id="n-all">–</span><span class="l">Events tracked</span></div>
+    <div class="stat"><span class="n" id="n-3">–</span><span class="l"><i class="dot s3"></i>Severe</span></div>
+    <div class="stat"><span class="n" id="n-2">–</span><span class="l"><i class="dot s2"></i>Elevated</span></div>
+    <div class="stat"><span class="n" id="n-1">–</span><span class="l"><i class="dot s1"></i>Monitor</span></div>
+  </section>
+
+  <section class="controls" aria-label="Filters">
+    <div class="row" id="cats"><span class="lab">Type</span></div>
+    <div class="row" id="sevs"><span class="lab">Severity</span></div>
+    <div class="row"><span class="lab">Search</span>
+      <input id="search" type="search" placeholder="Country, city or keyword" autocomplete="off">
+      <button class="reset" id="reset" type="button">Clear filters</button>
+    </div>
+  </section>
+
+  <section class="main">
+    <div class="panel">
+      <h2>World map <span id="map-count"></span></h2>
+      <div class="mapwrap" id="mapwrap">
+        <svg id="map" viewBox="0 0 960 480" role="img" aria-label="World map of tracked events"></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <div class="legend">
+        <span><i class="dot s3"></i>Severe: direct danger to life or major disruption</span>
+        <span><i class="dot s2"></i>Elevated: significant local disruption</span>
+        <span><i class="dot s1"></i>Monitor: limited impact for now</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Events <span id="list-count"></span></h2>
+      <div class="list" id="list"><div class="empty">Loading events…</div></div>
+    </div>
+  </section>
+
+  <footer>
+    <span><b>How this works.</b> This list is refreshed each morning from public sources (GDACS, USGS, UN OCHA, WHO, UKHSA, embassy advisories and major news outlets). Each event links to its source. Severity is an editorial assessment of the risk to people on the ground, not an official rating.</span>
+    <span><b>Not a substitute</b> for official government travel advice or emergency instructions from local authorities.</span>
+    <span>Working draft built on the Didomi Design System.</span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var CATS = [
+    ["conflict","Armed conflict"],["unrest","Civil unrest"],["earthquake","Earthquake"],
+    ["storm","Storm"],["flood","Flood"],["wildfire","Wildfire"],["health","Health"],["other","Other"]
+  ];
+  var CAT_LABEL = {}; CATS.forEach(function(c){CAT_LABEL[c[0]]=c[1];});
+  var SEV_LABEL = {3:"Severe",2:"Elevated",1:"Monitor"};
+  var state = {events:[], cats:new Set(), sevs:new Set(), q:"", sel:null, loaded:false};
+  var $ = function(id){return document.getElementById(id);};
+  function el(tag, cls, text){var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e;}
+  function str(v){return (v==null)?"":String(v);}
+  function sevOf(e){var s=Number(e.severity); return (s===3||s===2)?s:1;}
+  function catOf(e){return CAT_LABEL[e.category]?e.category:"other";}
+  function fmtDate(v){
+    var d=new Date(str(v)); if(isNaN(d)) return str(v);
+    return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+  }
+
+  /* ---------- filter chips ---------- */
+  function buildChips(){
+    CATS.forEach(function(c){
+      var b=el("button","chip"); b.type="button"; b.dataset.cat=c[0]; b.setAttribute("aria-pressed","false");
+      b.appendChild(el("span",null,c[1])); b.appendChild(el("span","c",""));
+      b.addEventListener("click",function(){toggle(state.cats,c[0]);});
+      $("cats").appendChild(b);
+    });
+    [3,2,1].forEach(function(s){
+      var b=el("button","chip"); b.type="button"; b.dataset.sev=String(s); b.setAttribute("aria-pressed","false");
+      b.appendChild(el("i","dot s"+s)); b.appendChild(el("span",null,SEV_LABEL[s]));
+      b.addEventListener("click",function(){toggle(state.sevs,s);});
+      $("sevs").appendChild(b);
+    });
+    $("search").addEventListener("input",function(ev){state.q=ev.target.value.trim().toLowerCase(); render();});
+    $("reset").addEventListener("click",function(){state.cats.clear();state.sevs.clear();state.q="";$("search").value="";render();});
+  }
+  function toggle(set,v){ if(set.has(v)) set.delete(v); else set.add(v); render(); }
+
+  function visible(){
+    return state.events.filter(function(e){
+      if(state.cats.size && !state.cats.has(catOf(e))) return false;
+      if(state.sevs.size && !state.sevs.has(sevOf(e))) return false;
+      if(state.q){
+        var hay=[e.title,e.country,e.place,e.summary,e.advice,CAT_LABEL[catOf(e)]].map(str).join(" ").toLowerCase();
+        if(hay.indexOf(state.q)<0) return false;
+      }
+      return true;
+    }).sort(function(a,b){
+      return (sevOf(b)-sevOf(a)) || str(b.updated).localeCompare(str(a.updated));
+    });
+  }
+
+  /* ---------- map ---------- */
+  var svg=d3.select("#map"), proj=d3.geoNaturalEarth1().fitExtent([[6,6],[954,474]],{type:"Sphere"});
+  var path=d3.geoPath(proj);
+  svg.append("path").attr("class","sphere").attr("d",path({type:"Sphere"}));
+  var gLand=svg.append("g"), gHalo=svg.append("g"), gMk=svg.append("g");
+  fetch("world.json").then(function(r){return r.json();}).then(function(w){
+    var f=topojson.feature(w,w.objects.countries).features;
+    gLand.selectAll("path").data(f).join("path").attr("class","country").attr("d",path);
+  }).catch(function(){ /* markers still render without the basemap */ });
+
+  function showTip(ev,e){
+    var tip=$("tip"); tip.textContent="";
+    tip.appendChild(el("b",null,str(e.title)));
+    tip.appendChild(el("span",null,SEV_LABEL[sevOf(e)]+" · "+CAT_LABEL[catOf(e)]+" · "+str(e.country)));
+    tip.hidden=false;
+    var box=$("mapwrap").getBoundingClientRect();
+    var x=ev.clientX-box.left+12, y=ev.clientY-box.top+12;
+    if(x+tip.offsetWidth>box.width-4) x=Math.max(4,x-tip.offsetWidth-24);
+    if(y+tip.offsetHeight>box.height-4) y=Math.max(4,y-tip.offsetHeight-24);
+    tip.style.left=x+"px"; tip.style.top=y+"px";
+  }
+  function drawMap(rows){
+    var pts=rows.filter(function(e){return isFinite(Number(e.lat))&&isFinite(Number(e.lon));})
+      .map(function(e){var p=proj([Number(e.lon),Number(e.lat)]); return {e:e,x:p[0],y:p[1]};})
+      .sort(function(a,b){return sevOf(a.e)-sevOf(b.e);});
+    gHalo.selectAll("circle").data(pts.filter(function(p){return sevOf(p.e)===3;}),function(p){return p.e._id;})
+      .join("circle").attr("class","halo").attr("cx",function(p){return p.x;}).attr("cy",function(p){return p.y;}).attr("r",13);
+    gMk.selectAll("circle").data(pts,function(p){return p.e._id;}).join("circle")
+      .attr("class",function(p){return "mk s"+sevOf(p.e)+(state.sel===p.e._id?" sel":"");})
+      .attr("cx",function(p){return p.x;}).attr("cy",function(p){return p.y;})
+      .attr("r",function(p){return 4+sevOf(p.e)*1.5;})
+      .attr("tabindex",0).attr("role","button")
+      .attr("aria-label",function(p){return str(p.e.title)+", "+SEV_LABEL[sevOf(p.e)];})
+      .on("mousemove",function(ev,p){showTip(ev,p.e);})
+      .on("mouseleave",function(){$("tip").hidden=true;})
+      .on("click",function(ev,p){select(p.e._id,true);})
+      .on("keydown",function(ev,p){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();select(p.e._id,true);}});
+    $("map-count").textContent=pts.length+" shown";
+  }
+
+  /* ---------- list ---------- */
+  function select(id,scroll){
+    state.sel=(state.sel===id&&!scroll)?null:id; render();
+    if(scroll){var n=document.querySelector('.item[data-id="'+CSS.escape(id)+'"]'); if(n) n.scrollIntoView({block:"nearest"});}
+  }
+  function drawList(rows){
+    var list=$("list"); list.textContent="";
+    if(!rows.length){
+      list.appendChild(el("div","empty", state.loaded ? (state.events.length?"No events match these filters.":"No events stored yet. The next morning refresh will fill this list.") : "Loading events…"));
+    }
+    rows.forEach(function(e){
+      var s=sevOf(e), b=el("button","item s"+s+(state.sel===e._id?" sel":"")); b.type="button"; b.dataset.id=e._id;
+      b.setAttribute("aria-expanded",state.sel===e._id?"true":"false");
+      var meta=el("div","meta");
+      var sv=el("span","sev"); sv.appendChild(el("i","dot s"+s)); sv.appendChild(el("span",null,SEV_LABEL[s]));
+      meta.appendChild(sv); meta.appendChild(el("span","cat",CAT_LABEL[catOf(e)]));
+      if(e.updated) meta.appendChild(el("span",null,"Updated "+fmtDate(e.updated)));
+      b.appendChild(meta);
+      b.appendChild(el("div","ttl",str(e.title)));
+      b.appendChild(el("div","where",[e.place,e.country].map(str).filter(Boolean).join(", ")));
+      var d=el("div","detail");
+      if(e.summary){var p=el("p"); p.appendChild(el("span","k","What is happening")); p.appendChild(document.createTextNode(str(e.summary))); d.appendChild(p);}
+      if(e.advice){var p2=el("p"); p2.appendChild(el("span","k","What it means for our people")); p2.appendChild(document.createTextNode(str(e.advice))); d.appendChild(p2);}
+      if(e.started){var p3=el("p"); p3.appendChild(el("span","k","Since")); p3.appendChild(document.createTextNode(fmtDate(e.started))); d.appendChild(p3);}
+      var u=str(e.source_url);
+      if(e.source||u){
+        var p4=el("p"); p4.appendChild(el("span","k","Source"));
+        if(u.indexOf("https://")===0){var a=el("a",null,str(e.source)||u); a.href=u; a.target="_blank"; a.rel="noopener noreferrer"; a.addEventListener("click",function(ev){ev.stopPropagation();}); p4.appendChild(a);}
+        else p4.appendChild(document.createTextNode(str(e.source)));
+        d.appendChild(p4);
+      }
+      b.appendChild(d);
+      b.addEventListener("click",function(){select(e._id,false);});
+      list.appendChild(b);
+    });
+    $("list-count").textContent=rows.length+" of "+state.events.length;
+  }
+
+  function render(){
+    var all=state.events, rows=visible();
+    $("n-all").textContent=state.loaded?all.length:"–";
+    [3,2,1].forEach(function(s){$("n-"+s).textContent=state.loaded?all.filter(function(e){return sevOf(e)===s;}).length:"–";});
+    document.querySelectorAll("#cats .chip").forEach(function(b){
+      var c=b.dataset.cat, n=all.filter(function(e){return catOf(e)===c;}).length;
+      b.setAttribute("aria-pressed",state.cats.has(c)?"true":"false"); b.querySelector(".c").textContent=n;
+      b.style.display=(n||state.cats.has(c))?"":"none";
+    });
+    document.querySelectorAll("#sevs .chip").forEach(function(b){b.setAttribute("aria-pressed",state.sevs.has(Number(b.dataset.sev))?"true":"false");});
+    drawMap(rows); drawList(rows);
+  }
+
+  function note(msg){var n=$("notice"); if(msg){n.textContent=msg;n.hidden=false;} else n.hidden=true;}
+  function setFresh(meta){
+    var f=$("fresh"); f.textContent="";
+    var d=meta&&meta.updatedAt?new Date(str(meta.updatedAt)):null;
+    if(!d||isNaN(d)){f.textContent="Last refresh unknown"; return;}
+    f.appendChild(document.createTextNode("Last refreshed "));
+    f.appendChild(el("strong",null,d.toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})));
+    if(Date.now()-d.getTime()>36*3600*1000) note("This list has not been refreshed for more than 36 hours. Check the linked sources for the latest situation.");
+  }
+
+  /* ---------- data ---------- */
+  buildChips(); render();
+  var timer=setTimeout(function(){ if(!state.loaded) note("The event list can't be reached yet. It will appear here as soon as it loads."); },10000);
+  function done(){clearTimeout(timer);}
+  function load(){
+    fetch("data/events.json",{cache:"no-store"}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }).then(function(j){
+      done();
+      state.events=(Array.isArray(j.events)?j.events:[]).map(function(o,i){var e=Object.assign({},o); e._id=str(o.id)||("e"+i); return e;});
+      state.loaded=true; note(""); setFresh(j); render();
+    }).catch(function(){
+      done(); state.loaded=true; render();
+      note(navigator.onLine===false?"You are offline and no saved copy of the event list is available yet.":"The event list could not be loaded. Reload the page to try again.");
+    });
+  }
+  load();
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) load(); });
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(function(){}); }
+
+})();
+</script>
+</body>
+</html>
